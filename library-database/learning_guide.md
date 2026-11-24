@@ -2,6 +2,12 @@
 
 아래 설명은 [스키마](01_schema.sql), [핵심 SQL](03_queries.sql), [실제 실행 결과](results/01_queries.txt)의 번호와 연결된다.
 
+## 어디부터 읽으면 될까
+
+표를 만드는 `CREATE TABLE`과 예시를 넣는 `INSERT`를 먼저 살펴본다. 조회에서는 `SELECT`로 열을 고르고 `WHERE`로 행을 고르는 것부터 읽는다. 번호로 표를 연결하는 `JOIN`, 같은 종류끼리 묶는 `GROUP BY`로 넘어가면 된다.
+
+`BEGIN`은 변경을 한 묶음으로 시작하고 `ROLLBACK`은 그 묶음을 실행 전 상태로 되돌린다. `PRAGMA`는 SQLite 설정을 바꾸거나 상태를 확인하는 명령이고, 날짜의 `CHECK`는 잘못된 값의 저장을 막는 조건이다. 처음에는 각각의 역할을 알아두면 된다. `.read`는 SQLite 명령줄에서 파일의 SQL을 실행하는 기능이다. [실행 방법](README.md#실행-가이드)
+
 ## 대여 한 건이 네 테이블과 연결되는 방법
 
 엑셀에서도 시트를 나누고 숫자로 다른 시트의 행을 찾아올 수 있다. 관계형 데이터베이스는 테이블 사이의 참조와 입력 규칙을 스키마에 선언하고, 데이터를 저장할 때 그 규칙을 검사한다. 이 프로젝트에서 등록되지 않은 회원 번호를 사용하면 SQLite가 대여 입력을 거부한다.
@@ -50,11 +56,20 @@
 
 ### Q05 미반납 대여에 회원명과 책 제목 붙이기
 
-`INNER JOIN member AS m ON m.id = r.member_id`와 `INNER JOIN book AS b ON b.id = r.book_id`를 통해 대여의 두 FK로 회원과 도서를 찾는다. `WHERE r.returned_on IS NULL`을 적용하자 5건이 나왔고, 반납기한이 가장 이른 것은 정유진이 빌린 《한 페이지의 산책》이다.
+```sql
+SELECT member.name, book.title
+FROM rental
+INNER JOIN member ON member.id = rental.member_id
+INNER JOIN book ON book.id = rental.book_id
+WHERE rental.returned_on IS NULL
+ORDER BY rental.due_on, rental.id;
+```
+
+`FROM rental`에서 대여 표를 읽는다. 첫 `ON`은 회원 번호를 맞춰 이름을 가져오고, 둘째 `ON`은 도서 번호를 맞춰 제목을 가져온다. 반납일이 비어 있는 대여만 고른 결과는 5건이다. 첫 행의 이름과 제목은 정유진과 《한 페이지의 산책》이다.
 
 ### Q06 도서별 카테고리 이름
 
-`INNER JOIN category AS c ON c.id = b.category_id`는 도서가 참조한 카테고리 행을 연결한다. 도서 15권이 모두 조회됐고 《바다의 우체국》의 카테고리는 소설로 표시됐다.
+`book AS b`와 `category AS c`는 같은 SQL 문 안에서 표 이름을 짧게 부르는 방법이다. `ON c.id = b.category_id`로 도서의 카테고리 번호를 맞춘다. 도서 15권이 모두 조회됐고 《바다의 우체국》의 카테고리는 소설로 표시됐다.
 
 ### Q07 대여하지 않은 회원까지 표시하기
 
@@ -78,11 +93,19 @@ ORDER BY rental_count DESC, m.id;
 
 ### Q10 도서별 누적 대여 일수
 
-`julianday(r.returned_on) - julianday(r.rented_on)`으로 반납일과 대여일 사이의 날짜 차이를 구한다. `GROUP BY b.id, b.title`로 도서별로 묶고 `SUM`으로 더한다. 《바다의 우체국》의 완료된 대여 4건은 4일, 11일, 6일, 9일로 합계가 30일이다. 당일 반납한 《달토끼의 정원》은 0일로 표시된다.
+```sql
+SELECT book_id, SUM(julianday(returned_on) - julianday(rented_on)) AS total_days
+FROM rental
+WHERE returned_on IS NOT NULL
+GROUP BY book_id
+ORDER BY total_days DESC, book_id;
+```
 
-### Q11 카테고리별 평균 대여 일수
+반납일이 있는 대여를 `GROUP BY book_id`로 책마다 묶는다. `julianday()`는 뺄셈에 쓸 수 있도록 날짜를 숫자로 바꿔 준다. `SUM`은 같은 책의 날짜 차이를 더한다. 도서 1번 《바다의 우체국》의 반납된 대여 네 건은 4일, 11일, 6일, 9일이어서 합계가 `30.0`일이다.
 
-카테고리에서 도서와 대여를 연결해 `GROUP BY c.id, c.name`으로 묶는다. `AVG`는 반납된 대여 한 건을 기준으로 평균을 내고 `ROUND(..., 1)`은 소수점 한 자리로 반올림한다. 여행 카테고리의 완료된 두 대여는 11일과 7일이어서 평균이 9.0일이다.
+### Q11 도서별 평균 대여 일수
+
+Q10과 같이 반납한 대여를 책마다 묶는다. `AVG`는 한 묶음의 값을 더해서 그 묶음의 대여 건수로 나눈다. 도서 1번의 평균은 30일을 4건으로 나눈 `7.5`일이다.
 
 ### Q12 대여 이력이 없는 회원
 
@@ -90,21 +113,21 @@ ORDER BY rental_count DESC, m.id;
 
 ### Q13 대여 반납 처리
 
-`UPDATE rental SET returned_on = '2026-11-24'`로 반납일을 기록한다. `WHERE id = 28 AND returned_on IS NULL`이 대상 행을 정하고, `RETURNING id AS rental_id, returned_on`으로 28번의 새 반납일 `2026-11-24`를 직접 확인한다.
+`UPDATE rental SET returned_on = '2026-11-24'`로 반납일을 기록한다. `WHERE id = 28`이 바꿀 행을 고른다. 다음 `SELECT id, returned_on`에서 대여 28번의 바뀐 반납일 `2026-11-24`를 읽는다.
 
 ### Q14 대여 기록 삭제
 
-`DELETE FROM rental WHERE id = 32`는 해당 행을 삭제한다. `RETURNING`은 지워진 행의 대여·회원·도서 번호 `32 | 4 | 10`을 돌려준다. Q13과 Q14는 `BEGIN`으로 시작한 트랜잭션 안에서 실행하고 마지막에 `ROLLBACK`으로 함께 되돌린다.
+`DELETE FROM rental WHERE id = 32`는 대여 32번을 삭제한다. 같은 번호의 행을 `COUNT(*)`로 세면 `remaining_rows`가 `0`이다. Q13과 Q14는 `BEGIN`으로 묶어서 실행하고 마지막 `ROLLBACK`에서 두 변경을 되돌린다.
 
 ### Q15 대여일 인덱스
 
-`CREATE INDEX IF NOT EXISTS idx_rental_rented_on ON rental (rented_on)`은 대여일 값과 행을 찾을 수 있는 인덱스를 만든다. Q04처럼 날짜 범위를 검색하고 같은 열로 정렬하는 경우 활용할 수 있다. 새 DB의 `EXPLAIN QUERY PLAN`에서 생성 전에는 `SCAN rental`과 임시 정렬이 나타났고, 생성 후에는 `SEARCH rental USING COVERING INDEX idx_rental_rented_on`으로 날짜 범위를 검색했다.
+`CREATE INDEX IF NOT EXISTS idx_rental_rented_on ON rental (rented_on)`은 대여일로 기록을 찾는 데 쓰이는 검색용 목록을 만든다. Q04처럼 날짜 범위를 조회할 때 쓰이는 열이다. 뒤의 SQLite 확인 명령 `PRAGMA index_info`를 실행하면 결과의 `name` 열에 `rented_on`이 나온다.
 
 ## 보너스에서 확인한 내용
 
 - **JOIN과 서브쿼리**로 11월에 대여한 회원을 구하자 둘 다 10명이 나왔다. JOIN 결과의 중복 회원은 `DISTINCT`로 줄였고, `EXISTS`는 대여가 있는 회원을 조건으로 골랐다.
 - **외래키 실험**에서는 회원 9999번을 참조한 대여가 거부됐다. 이미 등록된 회원 1번을 참조하자 입력이 성공했다.
-- **미니 리포트**는 어떤 날짜로 월을 구분할지, 인기 순위 동률을 어떻게 정렬할지, 연체율에 어떤 대여를 넣을지 먼저 정한 뒤 집계했다. 예를 들어 11월 대여 13건에는 미반납도 포함되며, 28번 미반납은 11월 24일 기준 이미 기한이 지나 연체로 계산된다. [보너스 리포트](bonus_report.md)
+- **미니 리포트**는 월별 대여 건수, 인기 도서 10권, 반납기한이 지난 미반납 대여 건수를 센다. 11월 대여는 13건이다. 2026-11-24 기준 미반납 연체는 24번과 28번 두 건이다. [보너스 리포트](bonus_report.md)
 
 ## 백엔드와 ORM에서 같은 관계 읽기
 

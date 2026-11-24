@@ -27,13 +27,13 @@ WHERE rented_on >= '2026-11-01'
   AND rented_on < '2026-12-01'
 ORDER BY rented_on, id;
 
--- [Q05] 조인. 미반납 대여의 회원명, 도서명, 반납기한을 확인한다.
-SELECT r.id AS rental_id, m.name AS member_name, b.title, r.due_on
-FROM rental AS r
-INNER JOIN member AS m ON m.id = r.member_id
-INNER JOIN book AS b ON b.id = r.book_id
-WHERE r.returned_on IS NULL
-ORDER BY r.due_on, r.id;
+-- [Q05] 조인. 아직 반납하지 않은 책과 빌린 회원 이름을 함께 조회한다.
+SELECT member.name, book.title
+FROM rental
+INNER JOIN member ON member.id = rental.member_id
+INNER JOIN book ON book.id = rental.book_id
+WHERE rental.returned_on IS NULL
+ORDER BY rental.due_on, rental.id;
 
 -- [Q06] 조인. 도서 목록에 각 도서가 속한 카테고리 이름을 표시한다.
 SELECT b.id AS book_id, b.title, c.name AS category_name
@@ -63,24 +63,19 @@ ORDER BY rental_count DESC, m.id;
 
 -- [Q10] 집계. 반납한 대여의 경과 일수를 도서별로 합산한다.
 -- SQLite의 julianday()로 두 날짜 사이의 일수 차이를 구한다.
-SELECT b.id AS book_id, b.title,
-       SUM(CAST(julianday(r.returned_on) - julianday(r.rented_on) AS INTEGER)) AS total_days
-FROM book AS b
-INNER JOIN rental AS r ON r.book_id = b.id
-WHERE r.returned_on IS NOT NULL
-GROUP BY b.id, b.title
-ORDER BY total_days DESC, b.id;
+SELECT book_id, SUM(julianday(returned_on) - julianday(rented_on)) AS total_days
+FROM rental
+WHERE returned_on IS NOT NULL
+GROUP BY book_id
+ORDER BY total_days DESC, book_id;
 
--- [Q11] 집계. 카테고리별로 반납한 대여의 평균 경과 일수를 계산한다.
--- SQLite의 julianday()로 일수 차이를 계산하고 소수점 한 자리까지 표시한다.
-SELECT c.id AS category_id, c.name AS category_name,
-       ROUND(AVG(julianday(r.returned_on) - julianday(r.rented_on)), 1) AS average_days
-FROM category AS c
-INNER JOIN book AS b ON b.category_id = c.id
-INNER JOIN rental AS r ON r.book_id = b.id
-WHERE r.returned_on IS NOT NULL
-GROUP BY c.id, c.name
-ORDER BY average_days DESC, c.id;
+-- [Q11] 집계. 반납한 대여의 경과 일수를 도서별로 평균 낸다.
+-- SQLite의 julianday()로 Q10과 동일하게 날짜 차이를 구한다.
+SELECT book_id, AVG(julianday(returned_on) - julianday(rented_on)) AS average_days
+FROM rental
+WHERE returned_on IS NOT NULL
+GROUP BY book_id
+ORDER BY average_days DESC, book_id;
 
 -- [Q12] 서브쿼리. 대여 기록이 한 건도 없는 회원을 찾는다.
 SELECT m.id AS member_id, m.name
@@ -93,38 +88,31 @@ WHERE NOT EXISTS (
 ORDER BY m.id;
 
 -- [Q13] 수정. 미반납 상태인 28번 대여를 2026년 11월 24일에 반납 처리한다.
--- SQLite 3.35 이상의 RETURNING으로 변경된 행을 확인한다.
+-- BEGIN과 Q14 뒤의 ROLLBACK으로 두 실습을 함께 되돌린다.
 BEGIN;
 
 UPDATE rental
 SET returned_on = '2026-11-24'
-WHERE id = 28 AND returned_on IS NULL
-RETURNING id AS rental_id, returned_on;
+WHERE id = 28;
 
--- [Q14] 삭제. 32번 대여 기록의 삭제를 시연하고 삭제된 행을 확인한다.
--- SQLite 3.35 이상의 RETURNING으로 삭제한 행의 값을 확인한다.
+SELECT id, returned_on
+FROM rental
+WHERE id = 28;
+
+-- [Q14] 삭제. 32번 대여 기록을 삭제하고 해당 번호가 남아 있는지 센다.
 DELETE FROM rental
-WHERE id = 32
-RETURNING id AS rental_id, member_id, book_id;
+WHERE id = 32;
+
+SELECT COUNT(*) AS remaining_rows
+FROM rental
+WHERE id = 32;
 
 -- 수정과 삭제를 확인한 뒤 샘플 데이터로 되돌린다.
 ROLLBACK;
 
--- [Q15] 인덱스. 대여일 인덱스를 만들고 Q04의 실행 계획을 전후로 확인한다.
+-- [Q15] 인덱스. 대여일 인덱스를 만들고 적용한 열을 확인한다.
 -- rented_on 인덱스는 날짜 범위에 해당하는 행을 찾고 날짜순으로 읽는 데 쓰인다.
--- SQLite의 EXPLAIN QUERY PLAN으로 실행 계획을 표시한다.
-EXPLAIN QUERY PLAN
-SELECT id AS rental_id, rented_on
-FROM rental
-WHERE rented_on >= '2026-11-01'
-  AND rented_on < '2026-12-01'
-ORDER BY rented_on, id;
-
 CREATE INDEX IF NOT EXISTS idx_rental_rented_on ON rental (rented_on);
 
-EXPLAIN QUERY PLAN
-SELECT id AS rental_id, rented_on
-FROM rental
-WHERE rented_on >= '2026-11-01'
-  AND rented_on < '2026-12-01'
-ORDER BY rented_on, id;
+-- SQLite 전용 PRAGMA로 인덱스에 포함된 열을 확인한다.
+PRAGMA index_info(idx_rental_rented_on);

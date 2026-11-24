@@ -44,10 +44,10 @@ member_id | name
 10 | 서준서
 
 -- [B02] 미니 리포트. 대여 시작일을 기준으로 월별 대여 건수를 센다.
--- SQLite의 strftime()으로 YYYY-MM 형식의 연월을 구한다.
-SELECT strftime('%Y-%m', rented_on) AS rental_month, COUNT(*) AS rental_count
+-- SQLite의 substr()로 YYYY-MM-DD에서 앞 일곱 글자인 YYYY-MM을 가져온다.
+SELECT substr(rented_on, 1, 7) AS rental_month, COUNT(*) AS rental_count
 FROM rental
-GROUP BY strftime('%Y-%m', rented_on)
+GROUP BY substr(rented_on, 1, 7)
 ORDER BY rental_month;
 rental_month | rental_count
 2026-09 | 9
@@ -56,69 +56,36 @@ rental_month | rental_count
 
 -- [B03] 미니 리포트. 대여 건수가 많은 도서 열 권을 찾는다.
 -- 동률이면 도서 번호순으로 정렬하고 SQLite의 LIMIT으로 열 행만 가져온다.
-SELECT b.id AS book_id, b.title, COUNT(*) AS rental_count
-FROM book AS b
-INNER JOIN rental AS r ON r.book_id = b.id
-GROUP BY b.id, b.title
-ORDER BY rental_count DESC, b.id
+SELECT book_id, COUNT(*) AS rental_count
+FROM rental
+GROUP BY book_id
+ORDER BY rental_count DESC, book_id
 LIMIT 10;
-book_id | title | rental_count
-1 | 바다의 우체국 | 5
-2 | 밤기차의 편지 | 3
-4 | 별빛 관찰 일지 | 3
-5 | 처음 만나는 데이터베이스 | 3
-6 | 바다를 따라 걷는 길 | 3
-3 | 오래된 도시의 지도 | 2
-7 | 색으로 읽는 그림 | 2
-8 | 한 페이지의 산책 | 2
-9 | 시장의 작은 신호 | 2
-10 | 계절을 담는 식탁 | 2
+book_id | rental_count
+1 | 5
+2 | 3
+4 | 3
+5 | 3
+6 | 3
+3 | 2
+7 | 2
+8 | 2
+9 | 2
+10 | 2
 
--- [B04] 미니 리포트. 기준일 2026-11-24의 회원별 연체율을 계산한다.
--- 평가 대상은 기준일까지 반납됐거나 반납기한이 지난 대여다.
-WITH reference_date AS (
-    SELECT '2026-11-24' AS as_of
-),
-assessed_rental AS (
-    SELECT r.member_id,
-           CASE
-               WHEN r.due_on < d.as_of
-                    AND (r.returned_on IS NULL OR r.returned_on > r.due_on)
-               THEN 1
-               ELSE 0
-           END AS is_late
-    FROM rental AS r
-    CROSS JOIN reference_date AS d
-    WHERE r.rented_on <= d.as_of
-      AND (r.returned_on <= d.as_of OR r.due_on < d.as_of)
-)
-SELECT m.id AS member_id, m.name,
-       COUNT(a.member_id) AS assessed_count,
-       COALESCE(SUM(a.is_late), 0) AS late_count,
-       ROUND(100.0 * SUM(a.is_late) / NULLIF(COUNT(a.member_id), 0), 1) AS late_rate_pct
-FROM member AS m
-LEFT JOIN assessed_rental AS a ON a.member_id = m.id
-GROUP BY m.id, m.name
-ORDER BY late_rate_pct DESC, m.id;
-member_id | name | assessed_count | late_count | late_rate_pct
-2 | 이지우 | 3 | 3 | 100.0
-5 | 정유진 | 3 | 3 | 100.0
-9 | 임가은 | 2 | 1 | 50.0
-1 | 김하늘 | 5 | 2 | 40.0
-7 | 오수아 | 3 | 1 | 33.3
-3 | 박민준 | 3 | 0 | 0.0
-4 | 최서연 | 4 | 0 | 0.0
-6 | 한도윤 | 3 | 0 | 0.0
-8 | 윤지호 | 2 | 0 | 0.0
-10 | 서준서 | 1 | 0 | 0.0
-11 | 신나연 | 0 | 0 | NULL
-12 | 조하진 | 0 | 0 | NULL
+-- [B04] 미니 리포트. 기준일 2026-11-24에 반납기한이 지난 미반납 대여를 센다.
+SELECT COUNT(*) AS overdue_count
+FROM rental
+WHERE returned_on IS NULL
+  AND due_on < '2026-11-24';
+overdue_count
+2
 
 -- [B05] 무결성 실험. 없는 회원 번호를 참조하면 SQLite가 아래 INSERT를 거부한다.
--- SQLite CLI는 예상된 오류 이후에도 계속 실행하도록 -bail 없이 사용한다.
+-- SQLite CLI는 예상된 오류 다음 줄도 실행하도록 기본값 .bail off를 사용한다.
 BEGIN;
 
-Runtime error near line 71: FOREIGN KEY constraint failed (19)
+Runtime error near line 49: FOREIGN KEY constraint failed (19)
 INSERT INTO rental (id, member_id, book_id, rented_on, due_on)
 VALUES (999, 9999, 11, '2026-11-24', '2026-12-01');
 
@@ -128,11 +95,14 @@ WHERE id = 999;
 rows_after_failed_insert
 0
 
--- 실제 등록된 1번 회원으로 바꾸면 입력할 수 있다. SQLite 3.35+ RETURNING.
+-- 실제 등록된 1번 회원으로 바꿔 입력한 뒤 SELECT로 확인한다.
 INSERT INTO rental (id, member_id, book_id, rented_on, due_on)
-VALUES (999, 1, 11, '2026-11-24', '2026-12-01')
-RETURNING id AS rental_id, member_id, book_id;
-rental_id | member_id | book_id
+VALUES (999, 1, 11, '2026-11-24', '2026-12-01');
+
+SELECT id, member_id, book_id
+FROM rental
+WHERE id = 999;
+id | member_id | book_id
 999 | 1 | 11
 
 ROLLBACK;

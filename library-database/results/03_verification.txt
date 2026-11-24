@@ -15,18 +15,18 @@ Q07 | 기대 결과 일치 | 34행
 Q08 | 기대 결과 일치 | 8행
 Q09 | 기대 결과 일치 | 12행
 Q10 | 기대 결과 일치 | 14행
-Q11 | 기대 결과 일치 | 10행
+Q11 | 기대 결과 일치 | 14행
 Q12 | 기대 결과 일치 | 2행
 Q13 | 기대 결과 일치 | 1행
 Q14 | 기대 결과 일치 | 1행
-Q15 | 전체 검색 및 임시 정렬에서 인덱스 범위 검색으로 변경 | Q04 결과 일치
-Q13·Q14 | 실행 중 수정값과 삭제 상태를 확인하고 ROLLBACK 후 원래 32행 복원
+Q15 | idx_rental_rented_on 생성 | 적용 열 rented_on 확인
+Q13·Q14 | 실행 중 수정값과 삭제 상태 확인 | ROLLBACK 후 원래 32행 복원
 B01A | 기대 결과 일치 | 10행
 B01B | 기대 결과 일치 | 10행
 B02 | 기대 결과 일치 | 3행
 B03 | 기대 결과 일치 | 10행
-B04 | 기대 결과 일치 | 12행
-B05 | SQLITE_CONSTRAINT_FOREIGNKEY 1건 | 실패 후 0행, 수정 입력 성공, ROLLBACK 후 0행
+B04 | 2026-11-24 기준 미반납 연체 2건 | 대여 24·28번
+B05 | SQLITE_CONSTRAINT_FOREIGNKEY 1건 | 잘못된 입력 거부, 수정 입력 성공, ROLLBACK 후 0행
 제출 library.db | 재생성 DB와 스키마, 인덱스, 데이터 일치
 PRAGMA foreign_keys | 1
 PRAGMA foreign_key_check | 위반 0행
