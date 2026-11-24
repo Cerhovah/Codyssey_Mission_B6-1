@@ -1,0 +1,274 @@
+-- SQLite 전용 PRAGMA. 아래 UPDATE와 DELETE를 실행하는 연결에도 적용한다.
+PRAGMA foreign_keys = ON;
+
+-- [Q01] 기본 조회. 소설 카테고리의 도서를 제목순으로 조회한다.
+SELECT id AS book_id, title, author
+FROM book
+WHERE category_id = 1
+ORDER BY title, id;
+book_id | title | author
+12 | 골목 끝 책방 | 강은재
+1 | 바다의 우체국 | 유서진
+2 | 밤기차의 편지 | 백하린
+
+-- [Q02] 기본 조회. 제목에 '바다'가 들어간 도서를 검색한다.
+SELECT id AS book_id, title
+FROM book
+WHERE title LIKE '%바다%'
+ORDER BY id;
+book_id | title
+1 | 바다의 우체국
+6 | 바다를 따라 걷는 길
+
+-- [Q03] 기본 조회. 최근 가입 회원 다섯 명을 확인한다.
+-- LIMIT은 SQLite에서 지원하는 행 수 제한 문법이다.
+SELECT id AS member_id, name, joined_on
+FROM member
+ORDER BY joined_on DESC, id DESC
+LIMIT 5;
+member_id | name | joined_on
+12 | 조하진 | 2026-11-10
+11 | 신나연 | 2026-11-10
+10 | 서준서 | 2026-10-12
+9 | 임가은 | 2026-10-03
+8 | 윤지호 | 2026-09-20
+
+-- [Q04] 기본 조회. 2026년 11월에 시작한 대여를 날짜순으로 조회한다.
+SELECT id AS rental_id, rented_on
+FROM rental
+WHERE rented_on >= '2026-11-01'
+  AND rented_on < '2026-12-01'
+ORDER BY rented_on, id;
+rental_id | rented_on
+20 | 2026-11-01
+21 | 2026-11-03
+22 | 2026-11-04
+23 | 2026-11-05
+24 | 2026-11-07
+25 | 2026-11-08
+26 | 2026-11-10
+27 | 2026-11-12
+28 | 2026-11-14
+29 | 2026-11-17
+30 | 2026-11-21
+31 | 2026-11-22
+32 | 2026-11-22
+
+-- [Q05] 조인. 미반납 대여의 회원명, 도서명, 반납기한을 확인한다.
+SELECT r.id AS rental_id, m.name AS member_name, b.title, r.due_on
+FROM rental AS r
+INNER JOIN member AS m ON m.id = r.member_id
+INNER JOIN book AS b ON b.id = r.book_id
+WHERE r.returned_on IS NULL
+ORDER BY r.due_on, r.id;
+rental_id | member_name | title | due_on
+24 | 정유진 | 한 페이지의 산책 | 2026-11-14
+28 | 김하늘 | 바다의 우체국 | 2026-11-21
+29 | 서준서 | 바다를 따라 걷는 길 | 2026-11-24
+30 | 윤지호 | 시장의 작은 신호 | 2026-11-28
+31 | 임가은 | 색으로 읽는 그림 | 2026-11-29
+
+-- [Q06] 조인. 도서 목록에 각 도서가 속한 카테고리 이름을 표시한다.
+SELECT b.id AS book_id, b.title, c.name AS category_name
+FROM book AS b
+INNER JOIN category AS c ON c.id = b.category_id
+ORDER BY c.id, b.id;
+book_id | title | category_name
+1 | 바다의 우체국 | 소설
+2 | 밤기차의 편지 | 소설
+12 | 골목 끝 책방 | 소설
+3 | 오래된 도시의 지도 | 역사
+4 | 별빛 관찰 일지 | 과학
+13 | 구름은 어디에서 올까 | 과학
+5 | 처음 만나는 데이터베이스 | 기술
+14 | 코드로 쓰는 노트 | 기술
+6 | 바다를 따라 걷는 길 | 여행
+7 | 색으로 읽는 그림 | 예술
+15 | 유리창 너머의 풍경 | 예술
+8 | 한 페이지의 산책 | 에세이
+9 | 시장의 작은 신호 | 경제
+10 | 계절을 담는 식탁 | 요리
+11 | 달토끼의 정원 | 아동
+
+-- [Q07] 조인. 대여 이력이 없는 회원을 포함해 회원별 대여 기록을 조회한다.
+SELECT m.id AS member_id, m.name, r.id AS rental_id, r.rented_on
+FROM member AS m
+LEFT JOIN rental AS r ON r.member_id = m.id
+ORDER BY m.id, r.rented_on, r.id;
+member_id | name | rental_id | rented_on
+1 | 김하늘 | 1 | 2026-09-01
+1 | 김하늘 | 6 | 2026-09-10
+1 | 김하늘 | 11 | 2026-10-04
+1 | 김하늘 | 20 | 2026-11-01
+1 | 김하늘 | 28 | 2026-11-14
+2 | 이지우 | 2 | 2026-09-02
+2 | 이지우 | 13 | 2026-10-08
+2 | 이지우 | 21 | 2026-11-03
+3 | 박민준 | 4 | 2026-09-07
+3 | 박민준 | 14 | 2026-10-10
+3 | 박민준 | 22 | 2026-11-04
+4 | 최서연 | 3 | 2026-09-04
+4 | 최서연 | 12 | 2026-10-05
+4 | 최서연 | 25 | 2026-11-08
+4 | 최서연 | 32 | 2026-11-22
+5 | 정유진 | 5 | 2026-09-08
+5 | 정유진 | 16 | 2026-10-13
+5 | 정유진 | 24 | 2026-11-07
+6 | 한도윤 | 7 | 2026-09-12
+6 | 한도윤 | 17 | 2026-10-16
+6 | 한도윤 | 26 | 2026-11-10
+7 | 오수아 | 8 | 2026-09-18
+7 | 오수아 | 18 | 2026-10-18
+7 | 오수아 | 27 | 2026-11-12
+8 | 윤지호 | 9 | 2026-09-22
+8 | 윤지호 | 19 | 2026-10-24
+8 | 윤지호 | 30 | 2026-11-21
+9 | 임가은 | 10 | 2026-10-03
+9 | 임가은 | 23 | 2026-11-05
+9 | 임가은 | 31 | 2026-11-22
+10 | 서준서 | 15 | 2026-10-12
+10 | 서준서 | 29 | 2026-11-17
+11 | 신나연 | NULL | NULL
+12 | 조하진 | NULL | NULL
+
+-- [Q08] 조인. 기한 뒤에 반납된 대여와 해당 도서 제목을 확인한다.
+SELECT r.id AS rental_id, b.title, r.due_on, r.returned_on
+FROM rental AS r
+INNER JOIN book AS b ON b.id = r.book_id
+WHERE r.returned_on > r.due_on
+ORDER BY r.returned_on, r.id;
+rental_id | title | due_on | returned_on
+2 | 별빛 관찰 일지 | 2026-09-09 | 2026-09-11
+5 | 바다를 따라 걷는 길 | 2026-09-15 | 2026-09-19
+8 | 바다의 우체국 | 2026-09-25 | 2026-09-29
+11 | 처음 만나는 데이터베이스 | 2026-10-11 | 2026-10-15
+13 | 색으로 읽는 그림 | 2026-10-15 | 2026-10-17
+16 | 별빛 관찰 일지 | 2026-10-20 | 2026-10-22
+21 | 바다의 우체국 | 2026-11-10 | 2026-11-12
+23 | 오래된 도시의 지도 | 2026-11-12 | 2026-11-13
+
+-- [Q09] 집계. 대여 이력이 없는 회원을 포함해 회원별 대여 건수를 센다.
+SELECT m.id AS member_id, m.name, COUNT(r.id) AS rental_count
+FROM member AS m
+LEFT JOIN rental AS r ON r.member_id = m.id
+GROUP BY m.id, m.name
+ORDER BY rental_count DESC, m.id;
+member_id | name | rental_count
+1 | 김하늘 | 5
+4 | 최서연 | 4
+2 | 이지우 | 3
+3 | 박민준 | 3
+5 | 정유진 | 3
+6 | 한도윤 | 3
+7 | 오수아 | 3
+8 | 윤지호 | 3
+9 | 임가은 | 3
+10 | 서준서 | 2
+11 | 신나연 | 0
+12 | 조하진 | 0
+
+-- [Q10] 집계. 반납한 대여의 경과 일수를 도서별로 합산한다.
+-- SQLite의 julianday()로 두 날짜 사이의 일수 차이를 구한다.
+SELECT b.id AS book_id, b.title,
+       SUM(CAST(julianday(r.returned_on) - julianday(r.rented_on) AS INTEGER)) AS total_days
+FROM book AS b
+INNER JOIN rental AS r ON r.book_id = b.id
+WHERE r.returned_on IS NOT NULL
+GROUP BY b.id, b.title
+ORDER BY total_days DESC, b.id;
+book_id | title | total_days
+1 | 바다의 우체국 | 30
+5 | 처음 만나는 데이터베이스 | 24
+4 | 별빛 관찰 일지 | 21
+6 | 바다를 따라 걷는 길 | 18
+2 | 밤기차의 편지 | 16
+3 | 오래된 도시의 지도 | 13
+7 | 색으로 읽는 그림 | 9
+12 | 골목 끝 책방 | 9
+10 | 계절을 담는 식탁 | 8
+9 | 시장의 작은 신호 | 6
+14 | 코드로 쓰는 노트 | 5
+13 | 구름은 어디에서 올까 | 4
+8 | 한 페이지의 산책 | 2
+11 | 달토끼의 정원 | 0
+
+-- [Q11] 집계. 카테고리별로 반납한 대여의 평균 경과 일수를 계산한다.
+-- SQLite의 julianday()로 일수 차이를 계산하고 소수점 한 자리까지 표시한다.
+SELECT c.id AS category_id, c.name AS category_name,
+       ROUND(AVG(julianday(r.returned_on) - julianday(r.rented_on)), 1) AS average_days
+FROM category AS c
+INNER JOIN book AS b ON b.category_id = c.id
+INNER JOIN rental AS r ON r.book_id = b.id
+WHERE r.returned_on IS NOT NULL
+GROUP BY c.id, c.name
+ORDER BY average_days DESC, c.id;
+category_id | category_name | average_days
+5 | 여행 | 9.0
+6 | 예술 | 9.0
+4 | 기술 | 7.3
+2 | 역사 | 6.5
+3 | 과학 | 6.3
+1 | 소설 | 6.1
+8 | 경제 | 6.0
+9 | 요리 | 4.0
+7 | 에세이 | 2.0
+10 | 아동 | 0.0
+
+-- [Q12] 서브쿼리. 대여 기록이 한 건도 없는 회원을 찾는다.
+SELECT m.id AS member_id, m.name
+FROM member AS m
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM rental AS r
+    WHERE r.member_id = m.id
+)
+ORDER BY m.id;
+member_id | name
+11 | 신나연
+12 | 조하진
+
+-- [Q13] 수정. 미반납 상태인 28번 대여를 2026년 11월 24일에 반납 처리한다.
+-- SQLite 3.35 이상의 RETURNING으로 변경된 행을 확인한다.
+BEGIN;
+
+UPDATE rental
+SET returned_on = '2026-11-24'
+WHERE id = 28 AND returned_on IS NULL
+RETURNING id AS rental_id, returned_on;
+rental_id | returned_on
+28 | 2026-11-24
+
+-- [Q14] 삭제. 32번 대여 기록의 삭제를 시연하고 삭제된 행을 확인한다.
+-- SQLite 3.35 이상의 RETURNING으로 삭제한 행의 값을 확인한다.
+DELETE FROM rental
+WHERE id = 32
+RETURNING id AS rental_id, member_id, book_id;
+rental_id | member_id | book_id
+32 | 4 | 10
+
+-- 수정과 삭제를 확인한 뒤 샘플 데이터로 되돌린다.
+ROLLBACK;
+
+-- [Q15] 인덱스. 대여일 인덱스를 만들고 Q04의 실행 계획을 전후로 확인한다.
+-- rented_on 인덱스는 날짜 범위에 해당하는 행을 찾고 날짜순으로 읽는 데 쓰인다.
+-- SQLite의 EXPLAIN QUERY PLAN으로 실행 계획을 표시한다.
+EXPLAIN QUERY PLAN
+SELECT id AS rental_id, rented_on
+FROM rental
+WHERE rented_on >= '2026-11-01'
+  AND rented_on < '2026-12-01'
+ORDER BY rented_on, id;
+QUERY PLAN
+|--SCAN rental
+`--USE TEMP B-TREE FOR ORDER BY
+
+CREATE INDEX IF NOT EXISTS idx_rental_rented_on ON rental (rented_on);
+
+EXPLAIN QUERY PLAN
+SELECT id AS rental_id, rented_on
+FROM rental
+WHERE rented_on >= '2026-11-01'
+  AND rented_on < '2026-12-01'
+ORDER BY rented_on, id;
+QUERY PLAN
+`--SEARCH rental USING COVERING INDEX idx_rental_rented_on (rented_on>? AND rented_on<?)
