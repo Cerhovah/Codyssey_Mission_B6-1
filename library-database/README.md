@@ -1,63 +1,98 @@
 # 도서 대여 데이터베이스
 
-Codyssey 미션 「정보를 깔끔하게 정리하는 디지털 서랍장 만들기」의 SQLite 결과물이다. 가상의 회원, 도서, 카테고리, 대여 기록을 저장하고 조회부터 조인, 집계, 수정, 삭제까지 SQL로 확인한다.
+Codyssey 미션 「정보를 깔끔하게 정리하는 디지털 서랍장 만들기」의 SQLite 결과물이다. 회원, 도서, 카테고리, 대여 기록을 연결하고 SQL 15개로 검색, 조인, 집계, 수정, 삭제를 확인한다.
 
-처음 읽을 때는 [학습 가이드](learning_guide.md)에서 1번 대여 기록이 어떤 테이블과 연결되는지 살펴본 뒤 [핵심 SQL 실행 결과](results/01_queries.txt)를 보면 된다.
+[실행 가이드](#실행-가이드) · [동료 평가 확인표](#동료-평가-확인표)
 
-## 실행 방법
+## 실행 가이드
 
-SQLite CLI 3.35 이상을 사용한다. 아래 명령은 macOS와 Linux 기준이다. 실행 결과는 macOS의 SQLite CLI 3.43.2에서 저장했고, 제약조건과 쿼리 결과는 Python의 `sqlite3`(SQLite 3.51.3)로도 검증했다. 제공된 DB는 읽기 전용 모드로 열어 볼 수 있다.
+macOS 또는 Linux의 SQLite CLI 3.35 이상에서 실행한다. 압축을 푼 뒤, 이 README와 `library.db` 파일이 보이는 `library-database` 폴더에서 터미널을 연다. 아래 명령을 같은 터미널에 단계별로 복사해 실행한다.
 
-```sh
-cd library-database
-sqlite3 -readonly -header -column library.db 'SELECT id, name FROM category ORDER BY id;'
-```
+### 1. 제출 DB 열기
 
-다음 순서로 실행하면 새 `practice.db`에 스키마와 샘플 데이터를 만들고 Q01~Q15의 결과를 확인할 수 있다. `practice.db`가 이미 있으면 새 파일명을 사용한다.
+제출된 `library.db`를 읽기 전용으로 연다. 카테고리 10개가 표시되며 첫 행은 소설, 마지막 행은 아동이다.
 
 ```sh
-sqlite3 -init /dev/null -batch -bail practice.db < 01_schema.sql
-sqlite3 -init /dev/null -batch -bail practice.db < 02_sample_data.sql
-sqlite3 -init /dev/null -batch -bail -echo -header -separator ' | ' -nullvalue NULL practice.db < 03_queries.sql
+sqlite3 --version
+sqlite3 -init /dev/null -readonly -header -column library.db \
+  'SELECT id, name FROM category ORDER BY id;'
 ```
 
-Q13과 Q14는 각각 28번 대여의 반납과 32번 대여의 삭제를 실제로 수행한 뒤 `ROLLBACK`으로 샘플 데이터를 복원한다. Q15가 만드는 대여일 인덱스는 DB에 저장된다. 제공된 `library.db`에는 인덱스가 이미 있으므로 생성 전후의 차이를 보려면 위와 같이 새 DB에서 실행한다.
+### 2. 샘플 DB 만들고 핵심 SQL 실행하기
+
+실행할 때마다 임시 폴더에 새 `practice.db`를 만든다. 스키마 생성, 샘플 입력, 핵심 SQL 실행이 순서대로 이어진다.
 
 ```sh
-sqlite3 -init /dev/null -batch -echo -header -separator ' | ' -nullvalue NULL practice.db < 04_bonus.sql 2>&1
+practice_dir="$(mktemp -d)" &&
+practice_db="$practice_dir/practice.db" &&
+sqlite3 -init /dev/null -batch -bail "$practice_db" < 01_schema.sql &&
+sqlite3 -init /dev/null -batch -bail "$practice_db" < 02_sample_data.sql &&
+sqlite3 -init /dev/null -batch -bail -echo -header -separator ' | ' -nullvalue NULL \
+  "$practice_db" < 03_queries.sql
 ```
 
-보너스 B05에서는 의도한 `FOREIGN KEY constraint failed` 오류로 CLI가 종료 코드 `1`을 반환한다. 오류 뒤에 유효한 회원 번호로 입력을 다시 시도하고 실험 데이터를 롤백할 수 있도록 이 명령은 CLI의 기본 오류 처리 동작을 사용한다.
+Q01~Q15의 SQL과 결과가 순서대로 나온다. 예를 들어 Q04에는 11월 대여 13건이 표시된다. Q13과 Q14는 반납과 삭제를 실행한 뒤 롤백으로 샘플을 복원한다. Q15는 대여일 인덱스를 만들고 생성 전후의 실행 계획을 보여 준다. [핵심 SQL 실제 출력](results/01_queries.txt)
 
-## 파일 구성
+### 3. 보너스 SQL 실행하기
 
-| 파일 | 역할 |
-| --- | --- |
-| [01_schema.sql](01_schema.sql) | 테이블 4개, 기본키, 외래키, 제약조건 |
-| [02_sample_data.sql](02_sample_data.sql) | 부모 테이블부터 순서대로 등록하는 가상 데이터 |
-| [03_queries.sql](03_queries.sql) | 목적을 주석으로 표시한 핵심 SQL 15개 |
-| [04_bonus.sql](04_bonus.sql) | JOIN과 서브쿼리 비교, 지표 3개, 외래키 오류와 복구 실험 |
-| [library.db](library.db) | 샘플 데이터와 대여일 인덱스가 들어 있는 SQLite 파일 |
-| [erd.png](erd.png) | 테이블과 PK·FK·1:N 관계를 표시한 ERD |
-| [results/](results/) | 핵심 SQL과 보너스의 실제 CLI 출력 및 검증 기록 |
-| [bonus_report.md](bonus_report.md) | 보너스 실험 결과와 지표 해석 |
-| [learning_guide.md](learning_guide.md) | 초보자를 위한 스키마 및 쿼리 해설 |
+B05는 없는 회원 번호로 입력해 오류가 나는지 확인하는 실험이다. `FOREIGN KEY constraint failed`와 종료 코드 `1`이 예상되며, 이후 올바른 번호로 입력하고 롤백까지 진행한다.
 
-## 요구사항과 검증 결과
+```sh
+sqlite3 -init /dev/null -batch -echo -header -separator ' | ' -nullvalue NULL \
+  "$practice_db" < 04_bonus.sql 2>&1
+```
 
-| 항목 | 완료 내용 |
-| --- | --- |
-| 스키마 | `category` → `book`, `member` → `rental`, `book` → `rental`의 1:N 관계 3개 |
-| 제약조건 | 테이블 4개의 PK, FK 3개, `NOT NULL`, `UNIQUE`, 날짜 형식과 순서에 대한 `CHECK` 검증 |
-| 샘플 데이터 | 카테고리 10개, 회원 12명, 도서 15권, 대여 32건 |
-| 핵심 SQL | 기본 조회 4개, 조인 4개(`INNER JOIN` 사용 쿼리 3개와 `LEFT JOIN` 사용 쿼리 1개), 집계 3개, 서브쿼리 1개, UPDATE·DELETE 2개, 인덱스 1개 |
-| 보너스 | JOIN과 EXISTS 결과 일치, 실제 FK 오류 및 올바른 입력 확인, 핵심 지표 3개 산출 |
-| 제출 자료 | SQL, DB, ERD와 쿼리별 실행 로그를 ZIP에 포함 |
+끝부분에 `rows_after_rollback`과 `0`이 나오면 실험까지 끝난 것이다. [보너스 실제 출력](results/02_bonus.txt)
 
-각 SQL 파일은 연결에 `PRAGMA foreign_keys = ON`을 적용한다. 검증 연결에서 외래키 활성화 값은 `1`이었고, `PRAGMA foreign_key_check`는 위반 행 0개, `PRAGMA integrity_check`는 `ok`를 반환했다. 테이블별 행 수와 UPDATE·DELETE 롤백, 인덱스 사용도 확인했다. [검증 기록](results/03_verification.txt)
+### 4. DB 무결성 확인하기
 
-실행 환경에 화면 녹화 권한이 없어 Q01~Q15와 보너스 결과는 SQLite CLI의 실제 텍스트 출력으로 저장했다.
+```sh
+sqlite3 -init /dev/null -batch -bail -readonly "$practice_db" <<'SQL'
+PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys;
+PRAGMA foreign_key_check;
+PRAGMA integrity_check;
+SQL
+```
+
+정상 출력은 `1`과 `ok` 두 줄이다. `1`은 현재 연결에서 외래키 검사가 활성화됐다는 뜻이다. `foreign_key_check`는 위반 행 0개를 반환하고, `ok`는 DB 무결성 검사 통과를 뜻한다.
+
+## 동료 평가 확인표
+
+표의 근거를 열면 해당 SQL과 결과를 확인할 수 있다. 파일을 내려받아 볼 때는 표의 Q 번호나 B 번호를 검색하면 된다.
+
+| 필수 항목 | 확인된 내용 | 근거 |
+| --- | --- | --- |
+| 실행 환경 | 로컬 SQLite CLI에서 SQL 파일을 실행 | [실행 가이드](#실행-가이드) |
+| 스키마와 관계 | 테이블 4개와 PK 4개, 카테고리→도서·회원→대여·도서→대여의 1:N 관계 3개 | [스키마](01_schema.sql) · [ERD](erd.png) |
+| 제약조건 | PK 중복, `NOT NULL`, `UNIQUE`, FK 및 날짜 `CHECK` 위반 입력을 거부 | [제약조건 검증](results/03_verification.txt#L6) |
+| 테이블당 최소 10행 | 카테고리 10개, 회원 12명, 도서 15권, 대여 32건 | [INSERT SQL](02_sample_data.sql) · [SQLite DB](library.db) · [행 수 검증](results/03_verification.txt#L2) |
+| 쿼리별 실행 기록 | 핵심 SQL 15개와 보너스 SQL의 목적, SQL 본문, 실제 출력 | [핵심 실행 기록](results/01_queries.txt) · [보너스 실행 기록](results/02_bonus.txt) |
+| 최종 무결성 | 외래키 검사 활성화, 위반 0건, DB 무결성 검사 `ok` | [무결성 검증](results/03_verification.txt#L30) |
+
+실행 환경의 화면 기록 권한이 없어 원본 미션에서 허용한 **실제 실행 결과 텍스트**를 사용했다. 기록은 SQLite CLI 3.43.2의 출력이다.
+
+### 핵심 SQL 15개
+
+| 요구사항 | 확인할 쿼리 | 근거 |
+| --- | --- | --- |
+| 기본 조회 4개 | Q01~Q04의 검색 조건, 정렬, 행 수 제한 | [SQL](03_queries.sql#L4) · [실행 결과](results/01_queries.txt#L4) |
+| 조인 4개 | Q05·Q06·Q08의 `INNER JOIN`, Q07의 `LEFT JOIN` | [SQL](03_queries.sql#L30) · [실행 결과](results/01_queries.txt#L57) |
+| 집계 3개 | Q09~Q11의 `GROUP BY`와 `COUNT`, `SUM`, `AVG` | [SQL](03_queries.sql#L57) · [실행 결과](results/01_queries.txt#L150) |
+| 서브쿼리 1개 | Q12의 `NOT EXISTS`로 대여 이력이 없는 회원 조회 | [SQL](03_queries.sql#L85) · [실행 결과](results/01_queries.txt#L217) |
+| 수정·삭제 2개 | Q13과 Q14에서 변경한 행과 롤백으로 복원된 상태 확인 | [SQL](03_queries.sql#L95) · [실행 결과](results/01_queries.txt#L230) · [롤백 검증](results/03_verification.txt#L23) |
+| 인덱스 1개 | Q15에서 대여일 범위 조회용 인덱스 생성과 실행 계획 비교 | [SQL과 생성 이유](03_queries.sql#L113) · [실행 결과](results/01_queries.txt#L252) |
+
+### 보너스 3개
+
+| 요구사항 | 확인된 내용 | 근거 |
+| --- | --- | --- |
+| 같은 요구를 JOIN과 서브쿼리로 해결 | B01A의 `JOIN`과 B01B의 `EXISTS` 모두 같은 회원 10명 반환 | [SQL](04_bonus.sql#L4) · [실행 결과](results/02_bonus.txt#L4) |
+| 외래키 오류와 해결 | B05에서 없는 회원 참조를 거부하고, 등록된 번호로 입력한 뒤 롤백 | [SQL](04_bonus.sql#L67) · [실행 결과](results/02_bonus.txt#L117) |
+| 핵심 지표 3개 | B02 월별 대여 건수, B03 인기 도서 TOP 10, B04 회원별 연체율 | [SQL](04_bonus.sql#L24) · [실행 결과](results/02_bonus.txt#L46) · [리포트](bonus_report.md#핵심-지표-3개) |
+
+테이블을 나눈 이유와 쿼리별 문법·결과 해석은 학습 가이드에서 볼 수 있다. [학습 가이드](learning_guide.md)
 
 ## AI 활용 범위
 
-사용자가 제공한 원본 미션과 실행 지시에 따라 Codex가 데이터 모델과 가상 샘플을 설계하고 SQL, ERD, 리포트, 학습 문서를 작성했다. SQLite에서 SQL을 실행해 결과를 저장하고 제약조건과 조회 결과를 검증했다.
+사용자가 제공한 미션 명세에 따라 Codex가 스키마, 가상 데이터, SQL, ERD와 문서를 작성하고 SQLite에서 실행과 검증을 수행했다.
