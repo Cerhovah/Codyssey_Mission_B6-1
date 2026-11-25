@@ -55,6 +55,10 @@ WHERE r.returned_on > r.due_on
 ORDER BY r.returned_on, r.id;
 
 -- [Q09] 집계. 대여 이력이 없는 회원을 포함해 회원별 대여 건수를 센다.
+-- 1. 회원마다 연결된 대여를 붙인다. 대여가 없으면 대여 열이 NULL인 행을 남긴다.
+-- 2. 회원 번호와 이름이 같은 행을 한 묶음으로 모은다.
+-- 3. 각 묶음의 대여 번호를 센다. COUNT(r.id)는 NULL을 건너뛰므로 대여가 없으면 0이다.
+-- 4. 건수가 많은 순으로, 동률이면 회원 번호순으로 정렬한다.
 SELECT m.id AS member_id, m.name, COUNT(r.id) AS rental_count
 FROM member AS m
 LEFT JOIN rental AS r ON r.member_id = m.id
@@ -63,6 +67,7 @@ ORDER BY rental_count DESC, m.id;
 
 -- [Q10] 집계. 반납한 대여의 경과 일수를 도서별로 합산한다.
 -- SQLite의 julianday()로 두 날짜 사이의 일수 차이를 구한다.
+-- 반납일이 NULL인 대여를 집계에서 빼고, 당일 반납은 경과 0일로 더한다.
 SELECT book_id, SUM(julianday(returned_on) - julianday(rented_on)) AS total_days
 FROM rental
 WHERE returned_on IS NOT NULL
@@ -70,7 +75,7 @@ GROUP BY book_id
 ORDER BY total_days DESC, book_id;
 
 -- [Q11] 집계. 반납한 대여의 경과 일수를 도서별로 평균 낸다.
--- SQLite의 julianday()로 Q10과 동일하게 날짜 차이를 구한다.
+-- Q10과 같은 날짜 차이를 쓴다. 도서별 분모는 반납이 완료된 건수다.
 SELECT book_id, AVG(julianday(returned_on) - julianday(rented_on)) AS average_days
 FROM rental
 WHERE returned_on IS NOT NULL
@@ -111,7 +116,8 @@ WHERE id = 32;
 ROLLBACK;
 
 -- [Q15] 인덱스. 대여일 인덱스를 만들고 적용한 열을 확인한다.
--- rented_on 인덱스는 날짜 범위에 해당하는 행을 찾고 날짜순으로 읽는 데 쓰인다.
+-- 좁은 날짜 범위의 행을 찾거나 날짜순으로 읽을 때 도움이 된다.
+-- 인덱스에도 기록을 보관하므로 저장 공간이 들고, 삽입·삭제·대여일 수정 때 유지 비용이 생긴다.
 CREATE INDEX IF NOT EXISTS idx_rental_rented_on ON rental (rented_on);
 
 -- SQLite 전용 PRAGMA로 인덱스에 포함된 열을 확인한다.

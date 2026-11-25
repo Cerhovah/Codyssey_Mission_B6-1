@@ -21,6 +21,7 @@ Q13 | 기대 결과 일치 | 1행
 Q14 | 기대 결과 일치 | 1행
 Q15 | idx_rental_rented_on 생성 | 적용 열 rented_on 확인
 Q13·Q14 | 실행 중 수정값과 삭제 상태 확인 | ROLLBACK 후 원래 32행 복원
+Q04 실행 계획 | Q15 전 SCAN rental → Q15 후 SEARCH rental USING COVERING INDEX idx_rental_rented_on
 B01A | 기대 결과 일치 | 10행
 B01B | 기대 결과 일치 | 10행
 B02 | 기대 결과 일치 | 3행
@@ -31,4 +32,11 @@ B05 | SQLITE_CONSTRAINT_FOREIGNKEY 1건 | 잘못된 입력 거부, 수정 입력
 PRAGMA foreign_keys | 1
 PRAGMA foreign_key_check | 위반 0행
 PRAGMA integrity_check | ok
-CLI 실행 기록 | Q01~Q15 및 B01A~B05 출력 확인
+CLI 3.43.2 실행 기록 | Q01~Q15, B01A~B05 다시 실행 | 기존 결과 값과 일치
+
+VS Code 시연 경로 재검증 | SQLite CLI 3.43.2
+README 명령 core·bonus | 기존 실행 텍스트와 21개 쿼리 출력 일치 | 둘 다 종료 코드 0
+Task 설정 | cwd와 인수를 적용해 필수 → 보너스 순서로 실행 확인
+재현 문서 | 빈 DB에서 스키마·샘플·필수·보너스·무결성 확인
+실행 안전성 | Q15는 복사본에서 생성 | 예상 외 오류는 실패 처리 | 동시 실행 후 임시 파일 정리
+원본 library.db | 실행 전후 SHA-256 일치 | 8fb6d25110eb7718c2eb236c5c3136c1c1e6cc50def6142e0866b0ca48e07aee

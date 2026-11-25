@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "도서 대여 · 자동 시연 창",
+      "type": "process",
+      "command": "swift",
+      "args": ["${workspaceFolder}/library-database/present.swift"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "도서 대여 · 전체 시연",
+      "dependsOrder": "sequence",
+      "dependsOn": ["도서 대여 · 필수 SQL", "도서 대여 · 보너스 SQL"],
+      "problemMatcher": []
+    },
+    {
+      "label": "도서 대여 · 필수 SQL",
+      "type": "process",
+      "command": "sh",
+      "args": ["${workspaceFolder}/library-database/demo.sh", "core"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "panel": "dedicated", "clear": true, "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "도서 대여 · 보너스 SQL",
+      "type": "process",
+      "command": "sh",
+      "args": ["${workspaceFolder}/library-database/demo.sh", "bonus"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "panel": "dedicated", "clear": true, "reveal": "always" },
+      "problemMatcher": []
+    }
+  ]
+}
